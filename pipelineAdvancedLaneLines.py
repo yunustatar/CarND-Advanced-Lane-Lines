@@ -142,8 +142,8 @@ def sobelxAndSColour(image):
     ax1.set_title('Colour binary', fontsize=50)
     ax2.imshow(combined_binary, cmap='gray')
     ax2.set_title('Combined binary', fontsize=50)
-    plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
-    plt.show()
+    #plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+    #plt.show()
 
     #return color_binary, combined_binary
     return combined_binary
@@ -171,7 +171,7 @@ def corners_unwarp(img, chess, nx, ny, mtx, dist):
     if ret == True:
         offset = 10
         # a) draw corners
-        cv2.drawChessboardCorners(chess, (nx, ny), corners, ret)
+        #cv2.drawChessboardCorners(chess, (nx, ny), corners, ret)
         #plt.imshow(chess)
         #plt.show()
         # b) define 4 source points src = np.float32([[,],[,],[,],[,]])
@@ -228,7 +228,6 @@ def corners_unwarp(img, chess, nx, ny, mtx, dist):
     warped = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
 
     return warped, M
-    #return warped
 
 
 def hist(img):
@@ -351,8 +350,8 @@ def fit_polynomial(binary_warped):
     out_img[righty, rightx] = [0, 0, 255]
 
     # Plots the left and right polynomials on the lane lines
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
 
     #return out_img
     return left_fit, right_fit
@@ -436,9 +435,9 @@ def search_around_poly(binary_warped, left_fit, right_fit):
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
     # Plot the polynomial lines onto the image
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.show()
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
+    #plt.show()
     ## End visualization steps ##
 
     #return result
@@ -489,8 +488,8 @@ def measure_curvature_real(ploty, left_fit_cr, right_fit_cr):
     return left_curverad, right_curverad
 
 
-def pipeline():
-    image = mpimg.imread('test_images/test6.jpg')
+def pipeline(image):
+    #image = mpimg.imread('test_images/test6.jpg')
     #image = mpimg.imread('test_images/straight_lines1.jpg')
     chess = mpimg.imread('camera_cal/calibration2.jpg')
 
@@ -545,8 +544,8 @@ def pipeline():
 
     binary_warped, M = corners_unwarp(thresholded, chess, nx, ny, mtx, dist)
 
-    plt.imshow(binary_warped)
-    plt.show()
+    #plt.imshow(binary_warped)
+    #plt.show()
 
     #out_img = fit_polynomial(binary_warped)
     #plt.imshow(out_img)
@@ -563,7 +562,7 @@ def pipeline():
 
     left_curverad, right_curverad = measure_curvature_real(ploty, left_fit, right_fit)
 
-    print(left_curverad, right_curverad)
+    #print(left_curverad, right_curverad)
 
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
@@ -582,7 +581,31 @@ def pipeline():
     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
     # Combine the result with the original image
     result = cv2.addWeighted(undistorted, 1, newwarp, 0.3, 0)
-    plt.imshow(result)
-    plt.show()
+    #plt.imshow(result)
+    #plt.show()
+    return result
 
-pipeline()
+
+# Import everything needed to edit/save/watch video clips
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
+
+
+def process_image(image):
+    """ This processes through everything above.
+    Will return the image with car position, lane curvature, and lane lines drawn.
+    """
+    result = pipeline(image)
+
+    return result
+
+# Convert to video
+# vid_output is where the image will be saved to
+vid_output = 'reg_vid.mp4'
+
+# The file referenced in clip1 is the original video before anything has been done to it
+clip1 = VideoFileClip("project_video.mp4")
+
+# NOTE: this function expects color images
+vid_clip = clip1.fl_image(process_image)
+vid_clip.write_videofile(vid_output, audio=False)
