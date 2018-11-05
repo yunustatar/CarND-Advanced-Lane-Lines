@@ -117,14 +117,14 @@ def sobelxAndSColour(image):
     scaled_sobel = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
 
     # Threshold x gradient
-    thresh_min = 17
-    thresh_max = 255
+    thresh_min = 20
+    thresh_max = 240
     sxbinary = np.zeros_like(scaled_sobel)
     sxbinary[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
 
     # Threshold color channel
-    s_thresh_min = 160
-    s_thresh_max = 220
+    s_thresh_min = 80
+    s_thresh_max = 250
     s_binary = np.zeros_like(s_channel)
     s_binary[(s_channel >= s_thresh_min) & (s_channel <= s_thresh_max)] = 1
 
@@ -142,8 +142,9 @@ def sobelxAndSColour(image):
     ax1.set_title('Colour binary', fontsize=50)
     ax2.imshow(combined_binary, cmap='gray')
     ax2.set_title('Combined binary', fontsize=50)
-    #plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
-    #plt.show()
+    if __debug__:
+        plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+        plt.show()
 
     #return color_binary, combined_binary
     return combined_binary
@@ -357,19 +358,11 @@ def fit_polynomial(binary_warped):
     return left_fit, right_fit
 
 
-# Polynomial fit values from the previous frame
-# Make sure to grab the actual values from the previous step in your project!
-#left_fit = np.array([2.13935315e-04, -3.77507980e-01, 4.76902175e+02])
-#right_fit = np.array([4.17622148e-04, -4.93848953e-01, 1.11806170e+03])
-
-
 def fit_poly(img_shape, leftx, lefty, rightx, righty):
-    ### TO-DO: Fit a second order polynomial to each with np.polyfit() ###
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
     # Generate x and y values for plotting
     ploty = np.linspace(0, img_shape[0] - 1, img_shape[0])
-    ### TO-DO: Calc both polynomials using ploty, left_fit and right_fit ###
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
@@ -471,10 +464,6 @@ def measure_curvature_real(ploty, left_fit_cr, right_fit_cr):
     ym_per_pix = 30 / 720  # meters per pixel in y dimension
     xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
 
-    # Start by generating our fake example data
-    # Make sure to feed in your real data instead in your project!
-    #ploty, left_fit_cr, right_fit_cr = generate_data(ym_per_pix, xm_per_pix)
-
     # Define y-value where we want radius of curvature
     # We'll choose the maximum y-value, corresponding to the bottom of the image
     y_eval = np.max(ploty)
@@ -485,7 +474,22 @@ def measure_curvature_real(ploty, left_fit_cr, right_fit_cr):
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
 
-    return left_curverad, right_curverad
+    radius_of_curvature = (0.5 * left_curverad) + (0.5 * right_curverad)
+
+    return left_curverad, right_curverad, radius_of_curvature
+
+def second_ord_poly(line, val):
+    '''
+    Simple function being used to help calculate distance from center.
+    Only used within Draw Lines below. Finds the base of the line at the
+    bottom of the image.
+    '''
+    a = line[0]
+    b = line[1]
+    c = line[2]
+    formula = (a*val**2)+(b*val)+c
+
+    return formula
 
 
 def pipeline(image):
@@ -501,29 +505,40 @@ def pipeline(image):
     dist = dist_pickle["dist"]
 
     undistorted = cv2.undistort(image, mtx, dist, None, mtx)
+    if __debug__:
+        plt.imshow(undistorted)
+        plt.show()
 
     thresholded = sobelxAndSColour(undistorted)
 
     # Gradient combinations
-    ksize = 15  # Choose a larger odd number to smooth gradient measurements
+    ksize = 17  # Choose a larger odd number to smooth gradient measurements
 
     # Apply each of the thresholding functions
     gradx = abs_sobel_thresh(undistorted, orient='x', sobel_kernel=ksize, thresh=(20, 200))
     grady = abs_sobel_thresh(undistorted, orient='y', sobel_kernel=ksize, thresh=(20, 200))
-    mag_binary = mag_thresh(undistorted, sobel_kernel=ksize, mag_thresh=(20, 120))
-    dir_binary = dir_threshold(undistorted, sobel_kernel=ksize, thresh=(1.2, 3.0))
+    mag_binary = mag_thresh(undistorted, sobel_kernel=ksize, mag_thresh=(80, 120))
+    if __debug__:
+        plt.imshow(mag_binary)
+        plt.show()
+    dir_binary = dir_threshold(undistorted, sobel_kernel=ksize, thresh=(1.2, np.pi/2))
+    if __debug__:
+        plt.imshow(dir_binary)
+        plt.show()
 
     combined = np.zeros_like(dir_binary)
     #combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 0))] = 1
-    combined[(gradx == 1) | (thresholded) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+    #combined[(gradx == 1) | (thresholded) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+
 
     combinedWithColour = np.zeros_like(dir_binary)
-    combinedWithColour[(gradx == 1) | (thresholded == 1)] = 1
-
-    #plt.imshow(combinedWithColour)
-    #plt.show()
+    combinedWithColour[(thresholded == 1) & (dir_binary == 0) & (mag_binary == 0)] = 1
+    if __debug__:
+        plt.imshow(combinedWithColour)
+        plt.show()
 
     '''
+    #Test variations
     f, axarr = plt.subplots(3, 2)
     axarr[0, 0].imshow(gradx, cmap='gray')
     axarr[0, 0].set_title('gradx', fontsize=10)
@@ -542,27 +557,49 @@ def pipeline(image):
     nx = 9
     ny = 6
 
-    binary_warped, M = corners_unwarp(thresholded, chess, nx, ny, mtx, dist)
+    #binary_warped, M = corners_unwarp(thresholded, chess, nx, ny, mtx, dist)
+    binary_warped, M = corners_unwarp(combinedWithColour, chess, nx, ny, mtx, dist)
 
-    #plt.imshow(binary_warped)
-    #plt.show()
+    if __debug__:
+        plt.imshow(binary_warped)
+        plt.show()
 
-    #out_img = fit_polynomial(binary_warped)
+    out_img = fit_polynomial(binary_warped)
     #plt.imshow(out_img)
     #plt.show()
 
     left_fit, right_fit = fit_polynomial(binary_warped)
 
     # Run image through the pipeline
-    # Note that in your project, you'll also want to feed in the previous fits
     ploty, left_fitx, right_fitx = search_around_poly(binary_warped, left_fit, right_fit)
 
-    # Calculate the radius of curvature in pixels for both lane lines
-    #left_curverad, right_curverad = measure_curvature_pixels(ploty, left_fit, right_fit)
+    mid_point_x = 0.5 * (right_fitx + left_fitx)
 
-    left_curverad, right_curverad = measure_curvature_real(ploty, left_fit, right_fit)
+    #calculate lane width dynamically
+    ym_per_pix = 30 / 720  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+    ms_per_px = 0.5 * xm_per_pix + 0.5 * 3.7/(right_fitx - left_fitx)
 
-    #print(left_curverad, right_curverad)
+    left_fit_cr = np.polyfit(ploty*ym_per_pix, left_fitx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty*ym_per_pix, right_fitx*xm_per_pix, 2)
+
+    left_curverad, right_curverad, radius_of_curvature = measure_curvature_real(ploty, left_fit_cr, right_fit_cr)
+
+    # Calculating middle of the image, aka where the car camera is
+    middle_of_image = image.shape[1] / 2
+    car_position = middle_of_image * xm_per_pix
+
+    # Calculating middle of the lane
+    left_line_base = second_ord_poly(left_fit_cr, image.shape[0] * ym_per_pix)
+    right_line_base = second_ord_poly(right_fit_cr, image.shape[0] * ym_per_pix)
+    lane_mid = (left_line_base + right_line_base) / 2
+
+    # Calculate distance from center and list differently based on left or right
+    dist_from_center = lane_mid - car_position
+    if dist_from_center >= 0:
+        center_text = "{} meters left of center".format(round(dist_from_center, 2))
+    else:
+        center_text = "{} meters right of center".format(round(-dist_from_center, 2))
 
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
@@ -581,8 +618,16 @@ def pipeline(image):
     newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
     # Combine the result with the original image
     result = cv2.addWeighted(undistorted, 1, newwarp, 0.3, 0)
-    #plt.imshow(result)
-    #plt.show()
+
+    # add annotation for radius and offset to image:
+    cv2.putText(result, 'Lane radius : {:2.2f}m'.format(radius_of_curvature),
+                (10, 100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(result, 'Vehicle Offset : {}'.format(center_text),
+                (10, 200), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
+
+    if __debug__:
+        plt.imshow(result)
+        plt.show()
     return result
 
 
@@ -601,11 +646,43 @@ def process_image(image):
 
 # Convert to video
 # vid_output is where the image will be saved to
-vid_output = 'reg_vid.mp4'
+#vid_output = 'challenge_video_output.mp4'
+vid_output = 'project_video_output2.mp4'
 
 # The file referenced in clip1 is the original video before anything has been done to it
 clip1 = VideoFileClip("project_video.mp4")
-
+#clip1 = clip1.subclip(0, 1)
 # NOTE: this function expects color images
 vid_clip = clip1.fl_image(process_image)
 vid_clip.write_videofile(vid_output, audio=False)
+
+'''
+#Grab some frames for testing
+clip1.save_frame("frame0_challenge.jpeg", t='00:00:00') # frame at time t=1h
+clip1.save_frame("frame1_challenge.jpeg", t='00:00:01') # frame at time t=1h
+clip1.save_frame("frame2_challenge.jpeg", t='00:00:02') # frame at time t=1h
+clip1.save_frame("frame3_challenge.jpeg", t='00:00:03') # frame at time t=1h
+clip1.save_frame("frame4_challenge.jpeg", t='00:00:04') # frame at time t=1h
+clip1.save_frame("frame5_challenge.jpeg", t='00:00:05') # frame at time t=1h
+clip1.save_frame("frame6_challenge.jpeg", t='00:00:06') # frame at time t=1h
+clip1.save_frame("frame7_challenge.jpeg", t='00:00:07') # frame at time t=1h
+clip1.save_frame("frame8_challenge.jpeg", t='00:00:08') # frame at time t=1h
+clip1.save_frame("frame9_challenge.jpeg", t='00:00:09') # frame at time t=1h
+clip1.save_frame("frame10_challenge.jpeg", t='00:00:10') # frame at time t=1h
+clip1.save_frame("frame11_challenge.jpeg", t='00:00:11') # frame at time t=1h
+clip1.save_frame("frame12_challenge.jpeg", t='00:00:12') # frame at time t=1h
+clip1.save_frame("frame13_challenge.jpeg", t='00:00:13') # frame at time t=1h
+clip1.save_frame("frame14_challenge.jpeg", t='00:00:14') # frame at time t=1h
+clip1.save_frame("frame15_challenge.jpeg", t='00:00:15') # frame at time t=1h
+clip1.save_frame("frame16_challenge.jpeg", t='00:00:16') # frame at time t=1h
+'''
+
+'''
+#Test on images
+#images = glob.glob('test_images/*.jpg')
+images = glob.glob('test_images/challenge/*.jpeg')
+
+for fname in images:
+    input = mpimg.imread(fname)
+    pipeline(input)
+'''
