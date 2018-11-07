@@ -136,15 +136,15 @@ def sobelxAndSColour(image):
     combined_binary = np.zeros_like(sxbinary)
     combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
 
-    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
-    f.tight_layout()
-    ax1.imshow(color_binary,)
-    ax1.set_title('Colour binary', fontsize=50)
-    ax2.imshow(combined_binary, cmap='gray')
-    ax2.set_title('Combined binary', fontsize=50)
-    if __debug__:
-        plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
-        plt.show()
+    #f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
+    #f.tight_layout()
+    #ax1.imshow(color_binary,)
+    #ax1.set_title('Colour binary', fontsize=50)
+    #ax2.imshow(combined_binary, cmap='gray')
+    #ax2.set_title('Combined binary', fontsize=50)
+    #if __debug__:
+    #    plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+    #    plt.show()
 
     #return color_binary, combined_binary
     return combined_binary
@@ -177,20 +177,6 @@ def corners_unwarp(img, chess, nx, ny, mtx, dist):
         #plt.show()
         # b) define 4 source points src = np.float32([[,],[,],[,],[,]])
 
-        '''
-        src = np.float32(
-            [corners[0],     # top left
-            corners[nx-1],   # top right
-            corners[-1],     # bottom right
-            corners[-nx]])   # bottom left
-
-        dst = np.float32(
-            [[offset,offset],
-            [img_size[0]-offset,offset],
-            [img_size[0]-offset,img_size[1]-offset],
-            [offset,img_size[1]-offset]])
-
-        '''
         width, height = img.shape[1], img.shape[0]
 
         bottom_left = [260, 669]
@@ -211,19 +197,6 @@ def corners_unwarp(img, chess, nx, ny, mtx, dist):
         src = np.array([bottom_left, top_left, top_right, bottom_right], np.float32)
         dst = np.array([bottom_left_dst, top_left_dst, top_right_dst, bottom_right_dst], np.float32)
 
-        '''
-        src = np.float32(
-            [(670, 430),  # top left
-             (727, 430),  # top right
-             (1110, 690),  # bottom right
-             (288, 690)])  # bottom left
-
-        dst = np.float32(
-            [(260, 55),
-             (1100, 55),
-             (1100, 700),
-             (260, 700)])
-        '''
 
     M = cv2.getPerspectiveTransform(src, dst)
     warped = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
@@ -373,7 +346,6 @@ def search_around_poly(binary_warped, left_fit, right_fit):
 #def search_around_poly(binary_warped):
     # HYPERPARAMETER
     # Choose the width of the margin around the previous polynomial to search
-    # The quiz grader expects 100 here, but feel free to tune on your own!
     margin = 100
 
     # Grab activated pixels
@@ -381,10 +353,9 @@ def search_around_poly(binary_warped, left_fit, right_fit):
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
 
-    ### TO-DO: Set the area of search based on activated x-values ###
+    ### Set the area of search based on activated x-values ###
     ### within the +/- margin of our polynomial function ###
-    ### Hint: consider the window areas for the similarly named variables ###
-    ### in the previous quiz, but change the windows to our new search area ###
+
     left_lane_inds = ((nonzerox > (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy +
                                    left_fit[2] - margin)) & (nonzerox < (left_fit[0] * (nonzeroy ** 2) +
                                                                          left_fit[1] * nonzeroy + left_fit[
@@ -474,7 +445,7 @@ def measure_curvature_real(ploty, left_fit_cr, right_fit_cr):
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
 
-    radius_of_curvature = (0.5 * left_curverad) + (0.5 * right_curverad)
+    radius_of_curvature = round(np.mean([left_curverad, right_curverad]),0)
 
     return left_curverad, right_curverad, radius_of_curvature
 
@@ -493,7 +464,7 @@ def second_ord_poly(line, val):
 
 
 def pipeline(image):
-    #image = mpimg.imread('test_images/test6.jpg')
+    test_image6 = mpimg.imread('test_images/test6.jpg')
     #image = mpimg.imread('test_images/straight_lines1.jpg')
     chess = mpimg.imread('camera_cal/calibration2.jpg')
 
@@ -504,7 +475,14 @@ def pipeline(image):
     mtx = dist_pickle["mtx"]
     dist = dist_pickle["dist"]
 
+    undistorted_chess = cv2.undistort(chess, mtx, dist, None, mtx)
+    cv2.imwrite('output_images/undistorted_chess_output.png', undistorted_chess)
+
+    undistorted_test_image6 = cv2.undistort(test_image6, mtx, dist, None, mtx)
+    cv2.imwrite('output_images/undistorted_test_image6.png', undistorted_test_image6)
+
     undistorted = cv2.undistort(image, mtx, dist, None, mtx)
+
     if __debug__:
         plt.imshow(undistorted)
         plt.show()
@@ -533,40 +511,25 @@ def pipeline(image):
 
     combinedWithColour = np.zeros_like(dir_binary)
     combinedWithColour[(thresholded == 1) & (dir_binary == 0) & (mag_binary == 0)] = 1
+    out_img = np.dstack((combinedWithColour, combinedWithColour, combinedWithColour)) * 255
+    cv2.imwrite('output_images/combinedWithColour_image.jpg', out_img)
     if __debug__:
         plt.imshow(combinedWithColour)
         plt.show()
 
-    '''
-    #Test variations
-    f, axarr = plt.subplots(3, 2)
-    axarr[0, 0].imshow(gradx, cmap='gray')
-    axarr[0, 0].set_title('gradx', fontsize=10)
-    axarr[0, 1].imshow(grady, cmap='gray')
-    axarr[0, 1].set_title('grady', fontsize=10)
-    axarr[1, 0].imshow(mag_binary, cmap='gray')
-    axarr[1, 0].set_title('mag_binary', fontsize=10)
-    axarr[1, 1].imshow(dir_binary, cmap='gray')
-    axarr[1, 1].set_title('dir_binary', fontsize=10)
-    axarr[2, 0].imshow(combined, cmap='gray')
-    axarr[2, 0].set_title('combined', fontsize=10)
-    axarr[2, 1].imshow(combinedWithColour, cmap='gray')
-    axarr[2, 1].set_title('combinedWithColour', fontsize=10)
-    #plt.show()
-    '''
     nx = 9
     ny = 6
 
     #binary_warped, M = corners_unwarp(thresholded, chess, nx, ny, mtx, dist)
     binary_warped, M = corners_unwarp(combinedWithColour, chess, nx, ny, mtx, dist)
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
+    cv2.imwrite('output_images/binary_warped.png', out_img)
 
     if __debug__:
         plt.imshow(binary_warped)
         plt.show()
 
     out_img = fit_polynomial(binary_warped)
-    #plt.imshow(out_img)
-    #plt.show()
 
     left_fit, right_fit = fit_polynomial(binary_warped)
 
@@ -621,9 +584,9 @@ def pipeline(image):
 
     # add annotation for radius and offset to image:
     cv2.putText(result, 'Lane radius : {:2.2f}m'.format(radius_of_curvature),
-                (10, 100), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
+                (10, 60), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(result, 'Vehicle Offset : {}'.format(center_text),
-                (10, 200), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
+                (10, 110), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
     if __debug__:
         plt.imshow(result)
@@ -647,7 +610,7 @@ def process_image(image):
 # Convert to video
 # vid_output is where the image will be saved to
 #vid_output = 'challenge_video_output.mp4'
-vid_output = 'project_video_output2.mp4'
+vid_output = 'project_video_output.mp4'
 
 # The file referenced in clip1 is the original video before anything has been done to it
 clip1 = VideoFileClip("project_video.mp4")
@@ -680,9 +643,11 @@ clip1.save_frame("frame16_challenge.jpeg", t='00:00:16') # frame at time t=1h
 '''
 #Test on images
 #images = glob.glob('test_images/*.jpg')
-images = glob.glob('test_images/challenge/*.jpeg')
-
-for fname in images:
-    input = mpimg.imread(fname)
-    pipeline(input)
+#images = glob.glob('test_images/challenge/*.jpeg')
+input = mpimg.imread('test_images/test2.jpg')
+i = 0
+#for fname in images:
+#input = mpimg.imread(fname)
+output = pipeline(input)
+cv2.imwrite('output_images/test2_output.jpg', output)
 '''
